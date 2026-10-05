@@ -1,0 +1,56 @@
+#include <Stepper.h>
+
+const int stepsPerRevolution = 2048; 
+Stepper myStepper(stepsPerRevolution, 8, 10, 9, 11);
+int currentPosition = 0;
+
+void setup() {
+  Serial.begin(9600);
+  myStepper.setSpeed(12);
+  
+  // 시리얼 수신 타임아웃을 짧게 설정하여 (기본 1초 -> 50ms) 멈춤 현상 방지
+  Serial.setTimeout(50);
+  
+  Serial.println("시스템 준비 완료.");
+}
+
+void loop() {
+  // 수신된 데이터가 있을 때만 처리
+  if (Serial.available() > 0) {
+    String command = Serial.readStringUntil('\n');
+    command.trim(); // 앞뒤 공백 및 보이지 않는 특수문자 완벽 제거
+
+    int targetSteps = 0;
+
+    if (command == "PAPER") {
+      targetSteps = 512;   // 90도
+    } 
+    else if (command == "PLASTIC") {
+      targetSteps = 1024;  // 180도
+    } 
+    else if (command == "CAN") {
+      targetSteps = 1536;  // 270도
+    } 
+    else if (command == "TRASH") {
+      targetSteps = 2048;  // 360도
+    } 
+    else {
+      return; // 매칭되지 않는 찌꺼기 데이터는 무시
+    }
+
+    // 1. 목표 각도로 이동
+    int moveSteps = targetSteps - currentPosition;
+    myStepper.step(moveSteps);
+    currentPosition = targetSteps;
+
+    // 2. 투입 대기 (대기 중 버퍼에 쌓인 쓰레기 신호는 오작동 방지를 위해 비워줌)
+    delay(3000);
+    while(Serial.available() > 0) {
+      Serial.read(); 
+    }
+
+    // 3. 원점 복귀
+    myStepper.step(-currentPosition);
+    currentPosition = 0;
+  }
+}
